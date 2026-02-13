@@ -1,0 +1,48 @@
+const mongoose = require('mongoose');
+
+const userSchema = new mongoose.Schema({
+    firstName: String,
+    lastName: String,
+    username: {
+        type: String,
+        required: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    password: {
+        type: String,
+        required: true
+    },
+    role: {
+        type: String,
+        enum: ['client', 'admin', 'livreur'],
+        default: 'client'
+    },
+    phone: {
+        type: String,
+        default: null
+    },
+    address: String,
+    city: String,
+    postalCode: String,
+    preferences: {
+        type: Object, // Stores JSON preferences
+        default: {}
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    status: {
+        type: String,
+        enum: ['active', 'pending', 'rejected'],
+        default: 'active'
+    },
+    resetPasswordOTP: String,
+    resetPasswordExpires: Date
+});
+
+module.exports = mongoose.model('User', userSchema);
