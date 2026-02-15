@@ -13,6 +13,10 @@ const transporter = nodemailer.createTransport({
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+    // Prevent hangs with specific timeouts
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,   // 10 seconds
+    socketTimeout: 30000,     // 30 seconds
 });
 
 /**
@@ -23,13 +27,16 @@ const transporter = nodemailer.createTransport({
  * @param {string} html - HTML body
  */
 const sendEmail = async (to, subject, text, html) => {
+    const fromAddress = process.env.EMAIL_USER;
     const mailOptions = {
-        from: `"Jebali Sweet" <${process.env.EMAIL_FROM}>`,
+        from: `"Jebali Sweet" <${fromAddress}>`,
         to: to,
         subject: subject,
         text: text,
         html: html,
     };
+
+    console.log(`📤 Sending email from: ${fromAddress} to: ${to}`);
 
     try {
         const info = await transporter.sendMail(mailOptions);
@@ -49,8 +56,9 @@ const sendEmail = async (to, subject, text, html) => {
  * @returns {Promise<boolean>} - Returns true if email sent successfully, false otherwise
  */
 const sendResetEmail = async (email, firstName, otp) => {
+    const fromAddress = process.env.EMAIL_USER;
     const mailOptions = {
-        from: `"Jebali Sweet" <${process.env.EMAIL_FROM || 'noreply@jebalisweet.com'}>`,
+        from: `"Jebali Sweet" <${fromAddress}>`,
         to: email,
         subject: 'Code de récupération de mot de passe - Jebali Sweet',
         html: `
@@ -59,126 +67,176 @@ const sendResetEmail = async (email, firstName, otp) => {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
                 <style>
                     body {
                         margin: 0;
                         padding: 0;
-                        font-family: Arial, sans-serif;
-                        background-color: #f4f4f4;
+                        font-family: 'Source Sans 3', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                        background-color: #FDF6F0;
+                        color: #2C1810;
+                    }
+                    .email-wrapper {
+                        width: 100%;
+                        table-layout: fixed;
+                        background-color: #FDF6F0;
+                        padding: 40px 0;
                     }
                     .email-container {
                         max-width: 600px;
-                        margin: 20px auto;
+                        margin: 0 auto;
                         background-color: #ffffff;
-                        border-radius: 8px;
+                        border-radius: 16px;
                         overflow: hidden;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        box-shadow: 0 10px 30px rgba(157, 90, 36, 0.08);
+                        border: 1px solid rgba(157, 90, 36, 0.1);
                     }
                     .header {
-                        background: linear-gradient(135deg, #d946ef 0%, #a855f7 100%);
-                        padding: 30px 20px;
+                        background-color: #ffffff;
+                        padding: 40px 20px 20px;
                         text-align: center;
-                        color: white;
+                        border-bottom: 1px solid #FDF6F0;
                     }
                     .header h1 {
                         margin: 0;
-                        font-size: 28px;
-                        font-weight: bold;
+                        font-family: 'Playfair Display', Georgia, serif;
+                        font-size: 32px;
+                        color: #9D5A24;
+                        letter-spacing: 1px;
+                        text-transform: uppercase;
                     }
                     .content {
-                        padding: 40px 30px;
-                        color: #333333;
+                        padding: 40px 50px;
                     }
                     .greeting {
-                        font-size: 18px;
+                        font-family: 'Playfair Display', Georgia, serif;
+                        font-size: 24px;
+                        font-weight: 700;
                         margin-bottom: 20px;
-                        color: #222;
+                        color: #2C1810;
                     }
                     .message {
-                        line-height: 1.6;
+                        font-size: 16px;
+                        line-height: 1.8;
                         margin-bottom: 30px;
-                        color: #555;
+                        color: #5C4033;
                     }
-                    .otp-box {
-                        background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);
-                        border: 2px solid #d946ef;
-                        border-radius: 8px;
-                        padding: 20px;
+                    .otp-container {
+                        background-color: #FDF6F0;
+                        border: 1px solid #E6D5C7;
+                        border-radius: 12px;
+                        padding: 30px;
                         text-align: center;
-                        margin: 30px 0;
+                        margin: 40px 0;
                     }
                     .otp-label {
-                        font-size: 14px;
-                        color: #666;
-                        margin-bottom: 10px;
+                        font-size: 13px;
+                        color: #9D5A24;
+                        margin-bottom: 15px;
                         text-transform: uppercase;
-                        letter-spacing: 1px;
-                    }
-                    .otp-code {
-                        font-size: 36px;
-                        font-weight: bold;
-                        color: #d946ef;
-                        letter-spacing: 8px;
-                        font-family: 'Courier New', monospace;
-                    }
-                    .expiry {
-                        font-size: 14px;
-                        color: #e11d48;
-                        margin-top: 15px;
+                        letter-spacing: 2px;
                         font-weight: 600;
                     }
-                    .warning {
-                        background-color: #fef3c7;
-                        border-left: 4px solid #f59e0b;
-                        padding: 15px;
-                        margin: 20px 0;
+                    .otp-code {
+                        font-size: 42px;
+                        font-weight: 700;
+                        color: #9D5A24;
+                        letter-spacing: 12px;
+                        font-family: 'Courier New', monospace;
+                        margin: 0 auto;
+                    }
+                    .expiry {
+                        font-size: 13px;
+                        color: #C5A059;
+                        margin-top: 20px;
+                        font-weight: 600;
+                    }
+                    .notice-box {
+                        background-color: #F9F5F1;
+                        border-left: 3px solid #C5A059;
+                        padding: 20px;
+                        margin: 30px 0;
                         font-size: 14px;
-                        color: #92400e;
+                        color: #5C4033;
+                        line-height: 1.6;
+                    }
+                    .notice-box strong {
+                        color: #9D5A24;
+                    }
+                    .cta-container {
+                        text-align: center;
+                        margin: 40px 0;
+                    }
+                    .cta-button {
+                        background-color: #9D5A24;
+                        color: #ffffff !important;
+                        padding: 16px 32px;
+                        text-decoration: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        display: inline-block;
+                        transition: background-color 0.3s ease;
                     }
                     .footer {
-                        background-color: #f9fafb;
-                        padding: 20px 30px;
+                        background-color: #FDF6F0;
+                        padding: 30px 50px;
                         text-align: center;
-                        font-size: 12px;
-                        color: #777;
-                        border-top: 1px solid #e5e7eb;
+                        font-size: 13px;
+                        color: #8C7365;
+                        border-top: 1px solid #E6D5C7;
+                    }
+                    .footer p {
+                        margin: 5px 0;
                     }
                     .footer a {
-                        color: #d946ef;
+                        color: #9D5A24;
                         text-decoration: none;
+                        font-weight: 600;
+                    }
+                    @media screen and (max-width: 600px) {
+                        .content { padding: 30px 20px; }
+                        .otp-code { font-size: 32px; letter-spacing: 8px; }
                     }
                 </style>
             </head>
             <body>
-                <div class="email-container">
-                    <div class="header">
-                        <h1>🍬 Jebali Sweet</h1>
-                    </div>
-                    <div class="content">
-                        <p class="greeting">Bonjour ${firstName},</p>
-                        <p class="message">
-                            Vous avez demandé la réinitialisation de votre mot de passe pour votre compte Jebali Sweet.
-                            Utilisez le code de vérification ci-dessous pour continuer :
-                        </p>
-                        
-                        <div class="otp-box">
-                            <div class="otp-label">Votre code de vérification</div>
-                            <div class="otp-code">${otp}</div>
-                            <div class="expiry">⏱️ Ce code expire dans 10 minutes</div>
+                <div class="email-wrapper">
+                    <div class="email-container">
+                        <div class="header">
+                            <h1>Jebali Sweet</h1>
                         </div>
+                        <div class="content">
+                            <p class="greeting">Bonjour ${firstName},</p>
+                            <p class="message">
+                                Vous avez demandé la réinitialisation de votre mot de passe pour votre compte Jebali Sweet. 
+                                Ce code de sécurité est nécessaire pour finaliser l'opération.
+                            </p>
+                            
+                            <div class="otp-container">
+                                <div class="otp-label">Votre code de vérification</div>
+                                <div class="otp-code">${otp}</div>
+                                <div class="expiry">⏱ Valide pendant 10 minutes</div>
+                            </div>
 
-                        <div class="warning">
-                            ⚠️ <strong>Important :</strong> Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer cet e-mail. 
-                            Votre mot de passe restera inchangé.
+                            <div class="cta-container">
+                                <a href="https://jebalisweet.tn" class="cta-button">Accéder à la boutique</a>
+                            </div>
+
+                            <div class="notice-box">
+                                <strong>Sécurité :</strong> Si vous n'êtes pas à l'origine de cette demande, 
+                                vous pouvez ignorer cet e-mail en toute sécurité. Votre compte reste protégé.
+                            </div>
+
+                            <p class="message" style="margin-bottom: 0;">
+                                Bien à vous,<br>
+                                <strong>L'équipe Jebali Sweet</strong>
+                            </p>
                         </div>
-
-                        <p class="message">
-                            Pour toute question, n'hésitez pas à nous contacter.
-                        </p>
-                    </div>
-                    <div class="footer">
-                        <p>&copy; ${new Date().getFullYear()} Jebali Sweet. Tous droits réservés.</p>
-                        <p>📞 +216 28 284 411</p>
+                        <div class="footer">
+                            <p>&copy; ${new Date().getFullYear()} Jebali Sweet. Maison de Pâtisserie Fine.</p>
+                            <p>🌐 <a href="https://jebalisweet.tn">jebalisweet.tn</a></p>
+                            <p>📞 <a href="tel:+21628284411">+216 28 284 411</a></p>
+                        </div>
                     </div>
                 </div>
             </body>
@@ -191,9 +249,9 @@ const sendResetEmail = async (email, firstName, otp) => {
         console.log(`✅ Email de récupération envoyé avec succès à ${email}`);
         return true;
     } catch (error) {
-        console.error('❌ Erreur lors de l\'envoi de l\'email:', error.message);
+        console.error('❌ Erreur lors de l\'envoi de l\'email reset:', error.message);
         if (error.response) {
-            console.error('📧 Réponse SMTP:', error.response);
+            console.error('📧 Réponse SMTP complète:', JSON.stringify(error.response, null, 2));
         }
         return false;
     }

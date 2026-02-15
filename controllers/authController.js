@@ -161,38 +161,18 @@ exports.sendOTP = async (req, res) => {
             resetPasswordExpires: expires
         });
 
-        // Always log OTP to console for development/debugging
-        console.log('\n' + '='.repeat(60));
-        console.log('🔐 CODE DE RÉCUPÉRATION GÉNÉRÉ');
-        console.log('='.repeat(60));
-        console.log(`📱 Téléphone: ${user.phone || 'Non renseigné'}`);
-        console.log(`👤 Utilisateur: ${user.firstName} ${user.lastName}`);
-        console.log(`📧 Email: ${user.email}`);
-        console.log(`🔢 CODE OTP: ${otp}`);
-        console.log(`⏰ Expire à: ${expires.toLocaleTimeString('fr-FR')}`);
-        console.log('='.repeat(60) + '\n');
-
         // Send email using the email service
         const emailSent = await sendResetEmail(user.email, user.firstName, otp);
 
         if (emailSent) {
             // Email sent successfully
             res.json({
-                message: 'Code envoyé avec succès par e-mail.',
-                development: false
+                message: 'Code envoyé avec succès par e-mail.'
             });
         } else {
-            // Email failed - development mode response
-            console.warn('⚠️  Email non envoyé - Mode développement activé');
-            console.log('ℹ️  Le client peut utiliser le code affiché ci-dessus');
-
-            // In development, return success with the OTP for testing
-            res.json({
-                message: 'Mode développement: Le code est disponible dans la console du serveur.',
-                development: true,
-                otp: otp, // Only exposed in development when email fails
-                phone: user.phone,
-                warning: '⚠️ En production, configurez correctement SendGrid pour envoyer des emails.'
+            // Email failed
+            res.status(500).json({
+                message: 'Erreur lors de l\'envoi de l\'e-mail de récupération. Veuillez réessayer plus tard.'
             });
         }
     } catch (error) {

@@ -18,4 +18,8 @@ router.put('/:id', userController.updateProfile);
 router.get('/:id/preferences', userController.getPreferences);
 router.put('/:id/preferences', userController.updatePreferences);
 
+// Admin only management routes
+router.get('/', roleMiddleware(['admin']), userController.getAllUsers);
+router.delete('/:id', roleMiddleware(['admin']), userController.deleteUser);
+
 module.exports = router;

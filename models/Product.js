@@ -11,6 +11,7 @@ const productSchema = new mongoose.Schema({
     brand: String,
     stockQuantity: { type: Number, default: 0 },
     inStock: { type: Boolean, default: true },
+    priceUnit: { type: String, default: 'pièce', enum: ['pièce', 'kg'] },
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     featured: { type: Boolean, default: false },

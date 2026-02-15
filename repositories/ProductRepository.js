@@ -3,7 +3,7 @@ const Product = require('../models/Product');
 
 class ProductRepository {
     async findAll(options = {}) {
-        const { page = 1, limit = 0, category, brand, minPrice, maxPrice, inStock, featured, sortBy, sortOrder } = options;
+        const { page = 1, limit = 0, category, brand, minPrice, maxPrice, inStock, featured, sortBy, sortOrder, search } = options;
         console.log('ProductRepository.findAll options:', { sortBy, sortOrder, page, limit }); // DEBUG LOG
         const skip = (page - 1) * limit;
 
@@ -22,11 +22,8 @@ class ProductRepository {
         }
 
         if (brand) {
-            if (Array.isArray(brand)) {
-                query.brand = { $in: brand };
-            } else {
-                query.brand = brand;
-            }
+            const brands = Array.isArray(brand) ? brand : [brand];
+            query.brand = { $in: brands };
         }
 
         if (minPrice !== undefined || maxPrice !== undefined) {
@@ -36,11 +33,15 @@ class ProductRepository {
         }
 
         if (inStock === 'true' || inStock === true) {
-            query.inStock = true;
+            query.stockQuantity = { $gt: 0 };
         }
 
         if (featured === 'true' || featured === true) {
             query.featured = true;
+        }
+
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
         }
 
         let productQuery = Product.find(query);
@@ -76,7 +77,8 @@ class ProductRepository {
                 id: obj._id.toString(),
                 ...obj,
                 category_name: obj.categoryName, // Maintain compatibility
-                stock_quantity: obj.stockQuantity
+                stock_quantity: obj.stockQuantity,
+                inStock: obj.stockQuantity > 0
             };
         });
 

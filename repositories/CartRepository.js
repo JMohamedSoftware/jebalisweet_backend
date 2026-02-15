@@ -22,6 +22,7 @@ class CartRepository {
                     image: p.image,
                     quantity: item.quantity,
                     inStock: p.inStock,
+                    stockQuantity: p.stockQuantity || 0,
                     comment: item.comment,
                     customImage: item.customImage,
                     customOptions: item.customOptions

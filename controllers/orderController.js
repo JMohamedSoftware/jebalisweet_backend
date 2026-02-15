@@ -1,4 +1,5 @@
 const orderRepository = require('../repositories/OrderRepository');
+const cartRepository = require('../repositories/CartRepository');
 
 exports.createOrder = async (req, res) => {
     const userId = req.user.id;
@@ -23,6 +24,11 @@ exports.createOrder = async (req, res) => {
         };
 
         const result = await orderRepository.create(orderData);
+
+        // Clear cart after successful order
+        if (userRole !== 'admin' && userId) {
+            await cartRepository.clearCart(userId);
+        }
 
         res.status(201).json({ message: 'Commande créée avec succès', orderId: result.orderId });
     } catch (error) {

@@ -8,7 +8,7 @@ exports.getAllProducts = async (req, res) => {
 
 
 
-        const { category, brand, minPrice, maxPrice, inStock, sortBy, sortOrder } = req.query;
+        const { category, brand, minPrice, maxPrice, inStock, sortBy, sortOrder, search } = req.query;
 
         // Handle multi-value brand filter if needed (express query parser handles ?brand=A&brand=B as array)
 
@@ -21,7 +21,8 @@ exports.getAllProducts = async (req, res) => {
             maxPrice,
             inStock,
             sortBy,
-            sortOrder
+            sortOrder,
+            search
         });
 
         res.json({
@@ -65,7 +66,7 @@ exports.createProduct = async (req, res) => {
 
         const result = await productRepository.create({
             name, description, price, image, category_id, categoryName, brand, stockQuantity,
-            featured: isFeatured, inStock
+            featured: isFeatured, inStock, priceUnit: req.body.priceUnit
         });
         res.status(201).json({ id: result.id, message: 'Produit créé.' });
     } catch (error) {
@@ -89,7 +90,7 @@ exports.updateProduct = async (req, res) => {
 
         const updatedProduct = await productRepository.update(id, {
             name, description, price, image, category_id, categoryName, brand, stockQuantity,
-            featured: isFeatured, inStock
+            featured: isFeatured, inStock, priceUnit: req.body.priceUnit
         });
 
         if (!updatedProduct) {

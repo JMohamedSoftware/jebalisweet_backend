@@ -166,3 +166,27 @@ exports.updateDriverStatus = async (req, res) => {
         res.status(500).json({ message: 'Erreur mise à jour status' });
     }
 };
+
+exports.getAllUsers = async (req, res) => {
+    try {
+        const users = await userRepository.findAll();
+        res.json(users);
+    } catch (error) {
+        console.error("Get All Users Error:", error);
+        res.status(500).json({ message: 'Erreur lors de la récupération des utilisateurs' });
+    }
+};
+
+exports.deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deleted = await userRepository.delete(id);
+        if (!deleted) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé' });
+        }
+        res.json({ message: 'Utilisateur supprimé avec succès' });
+    } catch (error) {
+        console.error("Delete User Error:", error);
+        res.status(500).json({ message: 'Erreur lors de la suppression de l\'utilisateur' });
+    }
+};

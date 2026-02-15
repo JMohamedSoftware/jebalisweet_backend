@@ -14,11 +14,12 @@ exports.getCart = async (req, res) => {
             price: item.price,
             image: item.image,
             quantity: item.quantity,
-            availability: item.inStock ? 'in_stock' : 'out_of_stock',
-            maxQuantity: 10,
+            stockQuantity: item.stockQuantity || 0,
+            availability: (item.stockQuantity || 0) > 0 ? 'in_stock' : 'out_of_stock',
+            maxQuantity: item.stockQuantity || 0,
             comment: item.comment,
             customImage: item.customImage,
-            customOptions: item.customOptions // Added
+            customOptions: item.customOptions
         }));
 
         res.json({ items: formattedItems });
@@ -29,11 +30,11 @@ exports.getCart = async (req, res) => {
 };
 
 exports.addToCart = async (req, res) => {
-    const { productId, quantity, customOptions, comment, customImage, isSet } = req.body;
+    const { productId, quantity, customOptions, comment, customImage, isAbsolute, isSet } = req.body;
     const userId = req.user.id || req.user._id;
 
     try {
-        await cartRepository.updateItem(userId, productId, quantity, customOptions, comment, customImage, isSet);
+        await cartRepository.updateItem(userId, productId, quantity, customOptions, comment, customImage, isAbsolute || isSet);
         res.json({ message: 'Panier mis à jour' });
     } catch (error) {
         console.error('addToCart error:', error);

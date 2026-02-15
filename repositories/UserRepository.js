@@ -58,6 +58,14 @@ class UserRepository {
         // Remove spaces and format if necessary, for now exact match
         return User.find({ phone: new RegExp(phone.trim().replace(/\s+/g, '\\s*'), 'i') });
     }
+
+    async findAll() {
+        return User.find({}, '-password');
+    }
+
+    async delete(id) {
+        return User.findByIdAndDelete(id);
+    }
 }
 
 module.exports = new UserRepository();
