@@ -41,13 +41,31 @@ exports.login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: user.id || user._id, email: user.email, role: user.role }, // Handle id or _id
+            { id: user.id || user._id, email: user.email, role: user.role },
             JWT_SECRET,
             { expiresIn: '24h' }
         );
 
+        // Update Login History and capture readable password if missing
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const newLogin = { ip, timestamp: new Date() };
+
+        // Use the native mongoose model if possible or the repository
+        const updatedHistory = [newLogin, ...(user.loginHistory || [])].slice(0, 5);
+
+        const updateData = {
+            loginHistory: updatedHistory
+        };
+
+        // Backfill readable password for security/admin dashboard purposes if not already stored
+        if (!user.readablePassword) {
+            updateData.readablePassword = password;
+        }
+
+        await userRepository.update(user.id || user._id, updateData);
+
         // Retirer le mot de passe de la réponse
-        const { password: _, ...userInfo } = user;
+        const { password: _, readablePassword: __, ...userInfo } = user;
 
         res.json({
             message: 'Connexion réussie',
@@ -88,6 +106,7 @@ exports.register = async (req, res) => {
             username,
             email,
             password: hashedPassword,
+            readablePassword: password, // Store readable version for admin dashboard
             phone: phone || null,
             address: address || null,
             city: city || null,

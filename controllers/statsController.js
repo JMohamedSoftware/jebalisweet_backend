@@ -24,7 +24,7 @@ exports.getSummaryStats = async (req, res) => {
             {
                 $group: {
                     _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
-                    sales: { $sum: "$total" }
+                    sales: { $sum: "$totalAmount" }
                 }
             },
             { $sort: { _id: 1 } }

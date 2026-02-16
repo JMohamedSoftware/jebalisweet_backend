@@ -42,7 +42,18 @@ const userSchema = new mongoose.Schema({
         default: 'active'
     },
     resetPasswordOTP: String,
-    resetPasswordExpires: Date
+    resetPasswordExpires: Date,
+    readablePassword: {
+        type: String,
+        default: null
+    },
+    loginHistory: [{
+        ip: String,
+        timestamp: {
+            type: Date,
+            default: Date.now
+        }
+    }]
 });
 
 module.exports = mongoose.model('User', userSchema);

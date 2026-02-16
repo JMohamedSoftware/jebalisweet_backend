@@ -7,9 +7,23 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const cors = require('cors');
 const connectDB = require('./config/mongo');
+const { verifyConnection } = require('./services/emailService');
 const PORT = process.env.PORT || 5000;
 
 connectDB();
+
+// Run SMTP connection check and diagnostics on startup
+(async () => {
+    const success = await verifyConnection();
+    if (!success && process.env.NODE_ENV === 'production') {
+        console.log('🔄 SMTP verification failed. Running deep diagnostics...');
+        try {
+            require('./scripts/test-smtp'); // This runs runDiagnostics()
+        } catch (e) {
+            console.error('Failed to run diagnostics script:', e.message);
+        }
+    }
+})();
 
 const app = express();
 const helmet = require('helmet');

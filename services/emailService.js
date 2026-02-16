@@ -5,18 +5,29 @@ require('dotenv').config();
  * Email Service - Nodemailer configuration for Gmail SMTP
  */
 
+const emailPort = parseInt(process.env.EMAIL_PORT) || 587;
+const isSecure = emailPort === 465;
+
+// Force fresh deployment to verify IPv4 fix on Render
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT) || 465,
-    secure: true, // true for 465, false for other ports
+    host: 'smtp.googlemail.com', // Alternative hostname
+    port: 465,
+    secure: true, // Port 465 uses SSL directly
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
-    // Prevent hangs with specific timeouts
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,   // 10 seconds
-    socketTimeout: 30000,     // 30 seconds
+    // Production/Render specific tweaks
+    debug: true,      // Show debug output in logs
+    logger: true,     // Log information to console
+    family: 4,        // Force IPv4 (Crucial for Render/Gmail timeouts)
+    tls: {
+        rejectUnauthorized: false
+    },
+    // Increased timeouts
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
 });
 
 /**
@@ -245,11 +256,15 @@ const sendResetEmail = async (email, firstName, otp) => {
     };
 
     try {
+        if (!transporter) {
+            throw new Error("Transporter node-mailer non initialisé");
+        }
         await transporter.sendMail(mailOptions);
         console.log(`✅ Email de récupération envoyé avec succès à ${email}`);
         return true;
     } catch (error) {
         console.error('❌ Erreur lors de l\'envoi de l\'email reset:', error.message);
+        console.error('   Stack trace:', error.stack);
         if (error.response) {
             console.error('📧 Réponse SMTP complète:', JSON.stringify(error.response, null, 2));
         }

@@ -35,8 +35,8 @@ class OrderRepository {
             createdBy: createdBy || 'client'
         });
 
-        // Clear cart after order creation (only for client orders)
-        if (userId && createdBy !== 'admin') {
+        // Clear cart after order creation
+        if (userId) {
             const userObjectId = (typeof userId === 'string' && userId.length === 24)
                 ? new (require('mongoose')).Types.ObjectId(userId)
                 : userId;

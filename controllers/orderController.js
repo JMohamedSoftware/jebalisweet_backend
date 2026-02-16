@@ -26,7 +26,7 @@ exports.createOrder = async (req, res) => {
         const result = await orderRepository.create(orderData);
 
         // Clear cart after successful order
-        if (userRole !== 'admin' && userId) {
+        if (userId) {
             await cartRepository.clearCart(userId);
         }
 
