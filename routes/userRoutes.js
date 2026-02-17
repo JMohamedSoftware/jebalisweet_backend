@@ -7,10 +7,14 @@ const roleMiddleware = require('../middleware/roleMiddleware');
 // All user routes require authentication
 router.use(authMiddleware);
 
+// Restricted to Admin or potential admin (requires login)
+router.post('/verify-admin-password', userController.verifyAdminPassword);
+
 // Specific routes first - restricted to Admin
 router.get('/role/drivers', roleMiddleware(['admin']), userController.getDrivers);
 router.get('/pending-drivers', roleMiddleware(['admin']), userController.getPendingDrivers);
 router.put('/:id/status', roleMiddleware(['admin']), userController.updateDriverStatus);
+router.post('/impersonate/:id', roleMiddleware(['admin']), userController.impersonateUser);
 
 // Dynamic routes after
 router.get('/:id', userController.getProfile);

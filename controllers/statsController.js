@@ -55,9 +55,9 @@ exports.getSummaryStats = async (req, res) => {
                 };
             }),
             ...latestUsers.map(u => ({
-                id: u._id.toString(),
+                id: null, // Don't expose user IDs in summary stats
                 type: 'customer',
-                message: `Nouvel utilisateur: ${u.username}`,
+                message: `Nouveau client inscrit`, // Keep it generic for PII
                 timestamp: u.createdAt,
                 priority: 'low'
             }))

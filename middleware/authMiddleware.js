@@ -11,8 +11,12 @@ const authMiddleware = (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_temporaire_pour_dev');
-        req.user = decoded; // Attacher les infos de l'utilisateur à la requête
+        if (!process.env.JWT_SECRET) {
+            console.error("CRITICAL: JWT_SECRET is not defined!");
+        }
+        // Security: Explicitly specify algorithms to prevent algorithm confusion attacks
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+        req.user = decoded;
         next();
     } catch (error) {
         return res.status(403).json({ message: 'Token invalide ou expiré.' });

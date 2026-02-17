@@ -12,7 +12,30 @@ exports.getAllTestimonials = async (req, res) => {
 
 exports.createTestimonial = async (req, res) => {
     try {
-        const testimonial = await testimonialRepository.create(req.body);
+        const { name, role, content, rating, avatar } = req.body;
+
+        // Robust XSS Sanitization: Encode HTML special characters
+        const sanitize = (str) => {
+            if (typeof str !== 'string') return str;
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+                .trim();
+        };
+
+        const sanitizedData = {
+            name: sanitize(name),
+            role: sanitize(role),
+            content: sanitize(content),
+            rating: Number(rating) || 5,
+            avatar: avatar || '/assets/images/default-avatar.png',
+            approved: false // Always force pending approval for new testimonials
+        };
+
+        const testimonial = await testimonialRepository.create(sanitizedData);
         res.status(201).json(testimonial);
     } catch (error) {
         console.error(error);

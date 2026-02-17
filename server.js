@@ -27,74 +27,110 @@ connectDB();
 
 const app = express();
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
 
-// Basic security headers
-app.use(helmet());
+// Use Helmet for basic security headers
+app.use(helmet({
+    contentSecurityPolicy: false, // Disable CSP for now to avoid breaking existing functionality if not tested
+    crossOriginEmbedderPolicy: false,
+    hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true
+    }
+}));
 
-// Request Logger
+// Rate Limiting
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Limit each IP to 10 login attempts per window
+    message: { message: 'Trop de tentatives de connexion. Veuillez réessayer dans 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // Limit each IP to 100 requests per minute
+    message: { message: 'Trop de requêtes. Veuillez patienter.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const testimonialLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // Limit each IP to 5 testimonials per hour
+    message: { message: 'Trop de témoignages envoyés. Veuillez réessayer plus tard.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Request Logger (Limited in Production)
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${req.get('origin')}`);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    }
     next();
 });
 
-// CORS configuration for Netlify deployment
+// CORS configuration for Netlify/Vercel deployment
 app.use(cors({
     origin: function (origin, callback) {
-        console.log('CORS Origin Request:', origin);
-        // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin) return callback(null, true);
 
-        // Allowed origins
         const allowedOrigins = [
             'http://localhost:4028',
             'http://localhost:3000',
             'https://jebalisweet.vercel.app',
-            /^(https?:\/\/)?(.*\.)?jebalisweet\.tn(:\d+)?$/, // Any jebalisweet.tn subdomain or port
-            /\.netlify\.app$/,  // Any Netlify subdomain
-            /\.ngrok\.io$/,     // ngrok URLs for testing
-            /\.ngrok-free\.app$/,  // ngrok free tier URLs
-            /\.ngrok-free\.dev$/,  // ngrok free tier URLs (dev TLD)
-            /^http:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,  // Any IP address (local network)
-            /^http:\/\/localhost:\d+$/          // Any localhost port
+            /^(https?:\/\/)?(.*\.)?jebalisweet\.tn(:\d+)?$/,
+            /\.netlify\.app$/,
+            /\.ngrok\.io$/,
+            /\.ngrok-free\.app$/,
+            /\.ngrok-free\.dev$/,
+            /^http:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+            /^http:\/\/localhost:\d+$/
         ];
 
-        // Check if origin is allowed
         const isAllowed = allowedOrigins.some(pattern => {
-            if (pattern instanceof RegExp) {
-                return pattern.test(origin);
-            }
+            if (pattern instanceof RegExp) return pattern.test(origin);
             return pattern === origin;
         });
 
         if (isAllowed) {
-            console.log('CORS Allowed:', origin);
             callback(null, true);
         } else {
-            console.warn('CORS Blocked:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Data Sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Apply general limiter to all API routes
+app.use('/api/', apiLimiter);
 
 // Routes de base
 app.get('/', (req, res) => {
     res.json({ message: 'Bienvenue sur l\'API Backend de Jebali Sweet' });
 });
 
-// Database status check
-app.get('/api/db-status', async (req, res) => {
+// Database status check - Restricted to Development
+app.get('/api/db-status', (req, res, next) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: 'Accès interdit en production.' });
+    }
+    next();
+}, async (req, res) => {
     try {
         const mongoose = require('mongoose');
         const state = mongoose.connection.readyState;
-        const states = {
-            0: 'disconnected',
-            1: 'connected',
-            2: 'connecting',
-            3: 'disconnecting'
-        };
+        const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
 
         let productCount = 0;
         if (state === 1) {
@@ -104,11 +140,10 @@ app.get('/api/db-status', async (req, res) => {
 
         res.json({
             status: states[state],
-            productCount: productCount,
-            dbName: mongoose.connection.name
+            productCount: productCount
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
@@ -119,23 +154,41 @@ const orderRoutes = require('./routes/orderRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const userRoutes = require('./routes/userRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
-const uploadRoutes = require('./routes/uploadRoutes'); // Import upload routes
-const aiRoutes = require('./routes/aiRoutes'); // Import AI routes
+const uploadRoutes = require('./routes/uploadRoutes');
 const promotionRoutes = require('./routes/promotionRoutes');
 const testimonialRoutes = require('./routes/testimonialRoutes');
 
-app.use('/api/auth', authRoutes);
+// Apply login limiter to auth routes
+app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/upload', uploadRoutes); // Use upload routes
-app.use('/api/ai', aiRoutes); // Use AI routes
+app.use('/api/upload', uploadRoutes);
 app.use('/api/promotions', promotionRoutes);
-app.use('/api/testimonials', testimonialRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve static files
+app.use('/api/testimonials', testimonialLimiter, testimonialRoutes);
+
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).json({ message: 'Ressource non trouvée' });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('SERVER ERROR:', err.stack);
+    const status = err.statusCode || 500;
+    const message = process.env.NODE_ENV === 'production'
+        ? 'Une erreur interne est survenue'
+        : err.message;
+
+    res.status(status).json({
+        success: false,
+        message: message,
+        ...(process.env.NODE_ENV !== 'production' && { error: err.stack })
+    });
+});
 
 // Démarrage du serveur
 app.listen(PORT, () => {

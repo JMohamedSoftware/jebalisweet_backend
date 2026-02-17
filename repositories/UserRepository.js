@@ -33,7 +33,17 @@ class UserRepository {
         };
     }
     async update(id, data) {
-        const user = await User.findByIdAndUpdate(id, data, { new: true });
+        // Security: Whitelist allowed fields to prevent prototype pollution and unauthorized role changes
+        const allowedFields = ['firstName', 'lastName', 'username', 'phone', 'address', 'city', 'postalCode', 'preferences', 'loginHistory', 'role', 'status'];
+        const filteredData = {};
+
+        allowedFields.forEach(field => {
+            if (data[field] !== undefined) {
+                filteredData[field] = data[field];
+            }
+        });
+
+        const user = await User.findByIdAndUpdate(id, filteredData, { new: true });
         if (!user) return null;
         return {
             id: user._id.toString(),

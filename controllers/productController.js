@@ -1,28 +1,14 @@
 const productRepository = require('../repositories/ProductRepository');
 const Category = require('../models/Category');
 
-exports.getAllProducts = async (req, res) => {
+exports.getAllProducts = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 0; // 0 means all
-
-
-
+        const limit = parseInt(req.query.limit) || 0;
         const { category, brand, minPrice, maxPrice, inStock, sortBy, sortOrder, search } = req.query;
 
-        // Handle multi-value brand filter if needed (express query parser handles ?brand=A&brand=B as array)
-
         const result = await productRepository.findAll({
-            page,
-            limit,
-            category,
-            brand,
-            minPrice,
-            maxPrice,
-            inStock,
-            sortBy,
-            sortOrder,
-            search
+            page, limit, category, brand, minPrice, maxPrice, inStock, sortBy, sortOrder, search
         });
 
         res.json({
@@ -32,12 +18,11 @@ exports.getAllProducts = async (req, res) => {
             totalPages: limit > 0 ? Math.ceil(result.total / limit) : 1
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur lors de la récupération des produits.' });
+        next(error);
     }
 };
 
-exports.getProductById = async (req, res) => {
+exports.getProductById = async (req, res, next) => {
     const { id } = req.params;
     try {
         const product = await productRepository.findById(id);
@@ -46,22 +31,16 @@ exports.getProductById = async (req, res) => {
         }
         res.json(product);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur serveur.' });
+        next(error);
     }
 };
 
-exports.createProduct = async (req, res) => {
-    // Logique Admin pour créer un produit
+exports.createProduct = async (req, res, next) => {
     let { name, description, price, image, category_id, categoryName, brand, stockQuantity, isFeatured, inStock } = req.body;
-
     try {
-        // Resolve category name if not provided but ID exists
         if (!categoryName && category_id) {
             const category = await Category.findById(category_id).catch(() => null);
-            if (category) {
-                categoryName = category.name;
-            }
+            if (category) categoryName = category.name;
         }
 
         const result = await productRepository.create({
@@ -70,22 +49,17 @@ exports.createProduct = async (req, res) => {
         });
         res.status(201).json({ id: result.id, message: 'Produit créé.' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur création produit.' });
+        next(error);
     }
 };
 
-exports.updateProduct = async (req, res) => {
+exports.updateProduct = async (req, res, next) => {
     const { id } = req.params;
     let { name, description, price, image, category_id, categoryName, brand, stockQuantity, isFeatured, inStock } = req.body;
-
     try {
-        // Resolve category name if not provided but ID exists
         if (!categoryName && category_id) {
             const category = await Category.findById(category_id).catch(() => null);
-            if (category) {
-                categoryName = category.name;
-            }
+            if (category) categoryName = category.name;
         }
 
         const updatedProduct = await productRepository.update(id, {
@@ -98,23 +72,21 @@ exports.updateProduct = async (req, res) => {
         }
         res.json(updatedProduct);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur mise à jour produit.' });
+        next(error);
     }
 };
 
-exports.deleteProduct = async (req, res) => {
+exports.deleteProduct = async (req, res, next) => {
     const { id } = req.params;
     try {
         await productRepository.delete(id);
         res.json({ message: 'Produit supprimé.' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur suppression produit.' });
+        next(error);
     }
 };
 
-exports.getProductMetadata = async (req, res) => {
+exports.getProductMetadata = async (req, res, next) => {
     try {
         const Product = require('../models/Product');
         const [brands, maxPriceProduct] = await Promise.all([
@@ -123,11 +95,10 @@ exports.getProductMetadata = async (req, res) => {
         ]);
 
         res.json({
-            brands: brands.filter(b => b), // Remove null/empty
+            brands: brands.filter(b => b),
             maxPrice: maxPriceProduct ? Math.ceil(maxPriceProduct.price) : 100
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur metadata.' });
+        next(error);
     }
 };

@@ -9,7 +9,7 @@ const productSchema = new mongoose.Schema({
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' }, // Updated to ObjectId
     categoryName: String, // Hybrid pattern to avoid join
     brand: String,
-    stockQuantity: { type: Number, default: 0 },
+    stockQuantity: { type: Number, default: 0, min: [0, 'Stock cannot be negative'] },
     inStock: { type: Boolean, default: true },
     priceUnit: { type: String, default: 'pièce', enum: ['pièce', 'kg'] },
     rating: { type: Number, default: 0 },

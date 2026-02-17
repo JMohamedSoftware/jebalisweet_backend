@@ -43,10 +43,6 @@ const userSchema = new mongoose.Schema({
     },
     resetPasswordOTP: String,
     resetPasswordExpires: Date,
-    readablePassword: {
-        type: String,
-        default: null
-    },
     loginHistory: [{
         ip: String,
         timestamp: {

@@ -4,15 +4,19 @@ const jwt = require('jsonwebtoken');
 const { sendResetEmail } = require('../services/emailService');
 require('dotenv').config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_temporaire_pour_dev';
+const JWT_SECRET = process.env.JWT_SECRET;
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
     const { email, password } = req.body;
     if (!email || !password) {
         return res.status(400).json({ message: 'Veuillez fournir un email et un mot de passe.' });
     }
 
-    // Normalize email
+    if (!JWT_SECRET) {
+        console.error("CRITICAL: JWT_SECRET environment variable is missing.");
+        return res.status(500).json({ message: 'Erreur de configuration serveur' });
+    }
+
     const emailLower = email.toLowerCase();
 
     try {
@@ -22,13 +26,10 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: 'Identifiants incorrects.' });
         }
 
-        // Comparaison du mot de passe haché
+        // Only compare hashed passwords. Remove plain-text fallback.
         const isMatch = await bcrypt.compare(password, user.password);
 
-        // Fallback temporaire pour le dev
-        const isPlainTextMatch = user.password === password;
-
-        if (!isMatch && !isPlainTextMatch) {
+        if (!isMatch) {
             return res.status(401).json({ message: 'Identifiants incorrects.' });
         }
 
@@ -46,26 +47,16 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        // Update Login History and capture readable password if missing
+        // Update Login History
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         const newLogin = { ip, timestamp: new Date() };
-
-        // Use the native mongoose model if possible or the repository
         const updatedHistory = [newLogin, ...(user.loginHistory || [])].slice(0, 5);
 
-        const updateData = {
-            loginHistory: updatedHistory
-        };
+        await userRepository.update(user.id || user._id, { loginHistory: updatedHistory });
 
-        // Backfill readable password for security/admin dashboard purposes if not already stored
-        if (!user.readablePassword) {
-            updateData.readablePassword = password;
-        }
-
-        await userRepository.update(user.id || user._id, updateData);
-
-        // Retirer le mot de passe de la réponse
-        const { password: _, readablePassword: __, ...userInfo } = user;
+        // Sanitize response
+        const userObj = user.toObject ? user.toObject() : user;
+        const { password: _, ...userInfo } = userObj;
 
         res.json({
             message: 'Connexion réussie',
@@ -73,8 +64,7 @@ exports.login = async (req, res) => {
             token: token
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur serveur.', error: error.message });
+        next(error);
     }
 };
 
@@ -84,9 +74,20 @@ exports.register = async (req, res) => {
         return res.status(400).json({ message: 'Tous les champs sont requis.' });
     }
 
+    // Security: Enforce Password Complexity (min 8 chars, at least one number or symbol)
+    const passwordRegex = /^(?=.*[0-9!@#$%^&*])(?=.{8,})/;
+    if (!passwordRegex.test(password)) {
+        return res.status(400).json({
+            message: 'Le mot de passe doit contenir au moins 8 caractères et inclure au moins un chiffre ou un caractère spécial.'
+        });
+    }
+
     // Normalize email
     email = email.toLowerCase();
     const username = `${firstName} ${lastName}`;
+
+    // Security: Never allow role escalation from request body
+    const finalRole = (role === 'livreur') ? 'livreur' : 'client';
 
     try {
         // Vérifier si l'email existe déjà
@@ -106,13 +107,12 @@ exports.register = async (req, res) => {
             username,
             email,
             password: hashedPassword,
-            readablePassword: password, // Store readable version for admin dashboard
             phone: phone || null,
             address: address || null,
             city: city || null,
             postalCode: postalCode || null,
-            role: role || 'client',
-            status: role === 'livreur' ? 'pending' : 'active'
+            role: finalRole,
+            status: finalRole === 'livreur' ? 'pending' : 'active'
         });
 
         // Auto-login: generate token
@@ -132,12 +132,11 @@ exports.register = async (req, res) => {
             userId: newUser.id || newUser._id
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur serveur.', error: error.message });
+        next(error);
     }
 };
 
-exports.checkEmail = async (req, res) => {
+exports.checkEmail = async (req, res, next) => {
     let { email } = req.body;
     email = email ? email.toLowerCase() : '';
     try {
@@ -158,12 +157,11 @@ exports.checkEmail = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur serveur.', error: error.message });
+        next(error);
     }
 };
 
-exports.sendOTP = async (req, res) => {
+exports.sendOTP = async (req, res, next) => {
     let { email } = req.body;
     email = email ? email.toLowerCase() : '';
     try {
@@ -180,27 +178,19 @@ exports.sendOTP = async (req, res) => {
             resetPasswordExpires: expires
         });
 
-        // Send email using the email service
         const emailSent = await sendResetEmail(user.email, user.firstName, otp);
 
         if (emailSent) {
-            // Email sent successfully
-            res.json({
-                message: 'Code envoyé avec succès par e-mail.'
-            });
+            res.json({ message: 'Code envoyé avec succès par e-mail.' });
         } else {
-            // Email failed
-            res.status(500).json({
-                message: 'Erreur lors de l\'envoi de l\'e-mail de récupération. Veuillez réessayer plus tard.'
-            });
+            res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'e-mail de récupération.' });
         }
     } catch (error) {
-        console.error('❌ Erreur serveur dans sendOTP:', error);
-        res.status(500).json({ message: 'Erreur serveur.', error: error.message });
+        next(error);
     }
 };
 
-exports.verifyOTP = async (req, res) => {
+exports.verifyOTP = async (req, res, next) => {
     const { userId, otp } = req.body;
     try {
         const user = await userRepository.findById(userId);
@@ -215,12 +205,11 @@ exports.verifyOTP = async (req, res) => {
 
         res.json({ message: 'Code valide.' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur serveur.', error: error.message });
+        next(error);
     }
 };
 
-exports.resetPassword = async (req, res) => {
+exports.resetPassword = async (req, res, next) => {
     const { userId, otp, newPassword } = req.body;
     try {
         const userWrapper = await userRepository.findById(userId);
@@ -242,9 +231,7 @@ exports.resetPassword = async (req, res) => {
         });
 
         res.json({ message: 'Mot de passe réinitialisé avec succès.' });
-
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Erreur serveur.', error: error.message });
+        next(error);
     }
 };

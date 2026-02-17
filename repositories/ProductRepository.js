@@ -7,22 +7,25 @@ class ProductRepository {
         console.log('ProductRepository.findAll options:', { sortBy, sortOrder, page, limit }); // DEBUG LOG
         const skip = (page - 1) * limit;
 
-        // Build query
+        // Helper to escape regex special characters to prevent ReDoS
+        const escapeRegex = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').substring(0, 100);
+
         const query = {};
 
         if (category && category !== 'Tous' && category !== 'Général') {
-            const regex = new RegExp(category, 'i');
+            const sanitizedCategory = escapeRegex(String(category));
+            const regex = new RegExp(sanitizedCategory, 'i');
             query.$or = [
                 { categoryName: regex }
             ];
 
-            if (mongoose.Types.ObjectId.isValid(category)) {
-                query.$or.push({ categoryId: category });
+            if (mongoose.Types.ObjectId.isValid(String(category))) {
+                query.$or.push({ categoryId: String(category) });
             }
         }
 
         if (brand) {
-            const brands = Array.isArray(brand) ? brand : [brand];
+            const brands = Array.isArray(brand) ? brand.map(b => String(b).substring(0, 50)) : [String(brand).substring(0, 50)];
             query.brand = { $in: brands };
         }
 
@@ -41,7 +44,7 @@ class ProductRepository {
         }
 
         if (search) {
-            query.name = { $regex: search, $options: 'i' };
+            query.name = { $regex: escapeRegex(String(search)), $options: 'i' };
         }
 
         let productQuery = Product.find(query);
