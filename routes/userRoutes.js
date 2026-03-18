@@ -3,12 +3,13 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
+const { loginLimiter } = require('../middleware/rateLimiters');
 
 // All user routes require authentication
 router.use(authMiddleware);
 
 // Restricted to Admin or potential admin (requires login)
-router.post('/verify-admin-password', userController.verifyAdminPassword);
+router.post('/verify-admin-password', loginLimiter, userController.verifyAdminPassword);
 
 // Specific routes first - restricted to Admin
 router.get('/role/drivers', roleMiddleware(['admin']), userController.getDrivers);

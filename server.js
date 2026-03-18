@@ -27,44 +27,39 @@ connectDB();
 
 const app = express();
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
+const { loginLimiter, apiLimiter, testimonialLimiter } = require('./middleware/rateLimiters');
 
 // Use Helmet for basic security headers
 app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP for now to avoid breaking existing functionality if not tested
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://va.vercel-scripts.com"], // Allow Vercel Analytics
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+            connectSrc: ["'self'", "https://jebalisweet-backend.onrender.com", "https://api.cloudinary.com", "https://res.cloudinary.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            frameAncestors: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    referrerPolicy: {
+        policy: 'strict-origin-when-cross-origin',
+    },
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" },
     hsts: {
         maxAge: 31536000, // 1 year
         includeSubDomains: true,
         preload: true
-    }
+    },
+    xssFilter: false // Modern CSP handles XSS, disable legacy filter (equivalent to X-XSS-Protection: 0)
 }));
-
-// Rate Limiting
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Limit each IP to 10 login attempts per window
-    message: { message: 'Trop de tentatives de connexion. Veuillez réessayer dans 15 minutes.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-const apiLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100, // Limit each IP to 100 requests per minute
-    message: { message: 'Trop de requêtes. Veuillez patienter.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-const testimonialLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // Limit each IP to 5 testimonials per hour
-    message: { message: 'Trop de témoignages envoyés. Veuillez réessayer plus tard.' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
 
 // Request Logger (Limited in Production)
 app.use((req, res, next) => {
@@ -82,13 +77,7 @@ app.use(cors({
         const allowedOrigins = [
             'http://localhost:4028',
             'http://localhost:3000',
-            'https://jebalisweet.vercel.app',
             /^(https?:\/\/)?(.*\.)?jebalisweet\.tn(:\d+)?$/,
-            /\.netlify\.app$/,
-            /\.ngrok\.io$/,
-            /\.ngrok-free\.app$/,
-            /\.ngrok-free\.dev$/,
-            /^http:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
             /^http:\/\/localhost:\d+$/
         ];
 
@@ -155,8 +144,8 @@ const statsRoutes = require('./routes/statsRoutes');
 const userRoutes = require('./routes/userRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
-const promotionRoutes = require('./routes/promotionRoutes');
 const testimonialRoutes = require('./routes/testimonialRoutes');
+const promoCodeRoutes = require('./routes/promoCodeRoutes');
 
 // Apply login limiter to auth routes
 app.use('/api/auth', loginLimiter, authRoutes);
@@ -168,6 +157,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/promotions', promotionRoutes);
+app.use('/api/promo-codes', promoCodeRoutes);
 app.use('/api/testimonials', testimonialLimiter, testimonialRoutes);
 
 // 404 Handler

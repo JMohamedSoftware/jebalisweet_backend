@@ -55,14 +55,21 @@ class CartRepository {
                 item.customImage === customImage
             );
 
+            if (Number(quantity) <= 0) {
+                throw new Error('La quantité doit être supérieure à zéro.');
+            }
+
             if (itemIndex > -1) {
                 if (isSet) {
                     cart.items[itemIndex].quantity = Number(quantity);
                 } else {
                     cart.items[itemIndex].quantity += Number(quantity);
+                    // Security check: ensure the resulting quantity isn't negative or zero
+                    if (cart.items[itemIndex].quantity <= 0) {
+                        cart.items.splice(itemIndex, 1); // Remove item if it reached 0 or less
+                    }
                 }
                 if (comment) cart.items[itemIndex].comment = comment;
-                // If the check above passed, customImage is already the same or both null
             } else {
                 cart.items.push({
                     product: productObjectId,

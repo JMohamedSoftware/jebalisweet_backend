@@ -13,6 +13,11 @@ class OrderRepository {
             const currentPrice = p ? p.price : 0;
             const pName = p ? p.name : 'Unknown Product - ' + item.productId;
 
+            // Security: Enforce positive quantity
+            if (Number(item.quantity) <= 0) {
+                throw new Error(`Quantité invalide pour le produit ${pName} (${item.quantity})`);
+            }
+
             calculatedTotal += (currentPrice * item.quantity);
 
             return {
@@ -28,10 +33,28 @@ class OrderRepository {
 
         const hasCustomImage = enrichedItems.some(item => item.customImage);
 
+        // Security: Re-validate promo code and recalculate discount on server
+        let finalDiscount = 0;
+        let validatedPromoCode = null;
+        if (data.promoCode) {
+            const promo = await require('./PromoCodeRepository').validateCode(data.promoCode);
+            if (promo.valid) {
+                validatedPromoCode = promo.promo.code;
+                finalDiscount = promo.promo.type === 'percentage'
+                    ? (calculatedTotal * promo.promo.discount / 100)
+                    : promo.promo.discount;
+                
+                // Optional: Increment usage count on successful order
+                await require('./PromoCodeRepository').incrementUsage(promo.promo._id);
+            }
+        }
+
         const newOrder = await Order.create({
             user: userId || null, // Allow null for admin-created orders
             items: enrichedItems,
-            totalAmount: calculatedTotal, // Security: Use recalculated total
+            totalAmount: calculatedTotal - finalDiscount, // Security: Use server-calculated total
+            discountAmount: finalDiscount,
+            promoCode: validatedPromoCode,
             deliveryAddress,
             paymentMethod,
             phone,
@@ -103,6 +126,8 @@ class OrderRepository {
                 phone: obj.phone,
                 paymentMethod: obj.paymentMethod,
                 deliveryOption: obj.deliveryOption,
+                promoCode: obj.promoCode || null,
+                discountAmount: obj.discountAmount || 0,
                 deliveryDriverId: obj.deliveryDriver?._id?.toString() || null,
                 deliveryDriverName: obj.deliveryDriver?.username || null,
                 estimatedDeliveryTime: obj.estimatedDeliveryTime,

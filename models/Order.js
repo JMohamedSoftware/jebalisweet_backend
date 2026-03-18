@@ -12,6 +12,8 @@ const orderSchema = new mongoose.Schema({
         customOptions: { type: Object, default: null } // Storing complex cake configs here
     }],
     totalAmount: Number,
+    discountAmount: { type: Number, default: 0 },
+    promoCode: { type: String, default: null },
     status: {
         type: String,
         enum: ['pending', 'pending_quote', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'cancelled'],
