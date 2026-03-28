@@ -26,9 +26,15 @@ connectDB();
 })();
 
 const app = express();
+// Enable trust proxy for Render (to get correct client IP)
+app.enable('trust proxy');
+
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-const { loginLimiter, apiLimiter, testimonialLimiter } = require('./middleware/rateLimiters');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const { apiLimiter, testimonialLimiter, strictLimiter } = require('./middleware/rateLimiters');
+const timeout = require('./middleware/timeoutMiddleware');
 
 // Use Helmet for basic security headers
 app.use(helmet({
@@ -61,11 +67,20 @@ app.use(helmet({
     xssFilter: false // Modern CSP handles XSS, disable legacy filter (equivalent to X-XSS-Protection: 0)
 }));
 
-// Request Logger (Limited in Production)
+// Apply global timeout (30 seconds)
+app.use(timeout(30000));
+
+// Request Logger (Enhanced for Production Troubleshooting)
 app.use((req, res, next) => {
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-    }
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        if (process.env.NODE_ENV === 'production' && (res.statusCode >= 400 || duration > 1000)) {
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} - ${duration}ms - IP: ${req.ip}`);
+        } else if (process.env.NODE_ENV !== 'production') {
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} - ${duration}ms`);
+        }
+    });
     next();
 });
 
@@ -95,14 +110,19 @@ app.use(cors({
     credentials: true
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Limit Request Payloads (Prevent large payload attacks)
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Data Sanitization against NoSQL query injection
 app.use(mongoSanitize());
+// Data Sanitization against XSS
+app.use(xss());
+// Prevent HTTP Parameter Pollution
+app.use(hpp());
 
-// Apply general limiter to all API routes
-app.use('/api/', apiLimiter);
+// Apply general limiter to ALL routes
+app.use(apiLimiter);
 
 // Routes de base
 app.get('/', (req, res) => {
@@ -145,19 +165,20 @@ const userRoutes = require('./routes/userRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const testimonialRoutes = require('./routes/testimonialRoutes');
+const promoRoutes = require('./routes/promotionRoutes');
 const promoCodeRoutes = require('./routes/promoCodeRoutes');
 
-// Apply login limiter to auth routes
-app.use('/api/auth', loginLimiter, authRoutes);
+// Apply auth routes without global loginLimiter to allow granular rate limiting
+app.use('/api/auth', authRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/stats', statsRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/promotions', promotionRoutes);
-app.use('/api/promo-codes', promoCodeRoutes);
+app.use('/api/stats', strictLimiter, statsRoutes);
+app.use('/api/users', strictLimiter, userRoutes);
+app.use('/api/upload', strictLimiter, uploadRoutes);
+app.use('/api/promotions', promoRoutes);
+app.use('/api/promo-codes', strictLimiter, promoCodeRoutes);
 app.use('/api/testimonials', testimonialLimiter, testimonialRoutes);
 
 // 404 Handler

@@ -43,11 +43,11 @@ exports.addToCart = async (req, res) => {
 };
 
 exports.removeFromCart = async (req, res) => {
-    const { productId, customOptions, customImage } = req.body;
+    const { productId, customOptions, customImage, comment } = req.body;
     const userId = req.user.id || req.user._id;
 
     try {
-        await cartRepository.removeItem(userId, productId, customOptions, customImage);
+        await cartRepository.removeItem(userId, productId, customOptions, customImage, comment);
         res.json({ message: 'Article supprimé' });
     } catch (error) {
         console.error(error);

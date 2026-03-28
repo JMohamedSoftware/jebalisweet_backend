@@ -18,6 +18,8 @@ exports.createOrder = async (req, res, next) => {
             paymentMethod,
             phone,
             deliveryOption,
+            promoCode: req.body.promoCode,
+            discountAmount: req.body.discountAmount,
             createdBy: userRole === 'admin' ? 'admin' : 'client'
         };
 
@@ -86,6 +88,16 @@ exports.updateOrderItems = async (req, res, next) => {
     try {
         const result = await orderRepository.updateOrderItems(id, items);
         res.json(result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.deleteOrder = async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        await orderRepository.delete(id);
+        res.json({ message: 'Commande supprimée avec succès' });
     } catch (error) {
         next(error);
     }

@@ -1,10 +1,16 @@
 const User = require('../models/User');
 
 class UserRepository {
+    // Helper to escape regex special characters to prevent ReDoS
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').substring(0, 100);
+    }
+
     async findByEmail(email) {
+        const sanitizedEmail = this.escapeRegex(email);
         // Case-insensitive search
         const user = await User.findOne({
-            email: new RegExp(`^${email}$`, 'i')
+            email: new RegExp(`^${sanitizedEmail}$`, 'i')
         });
         if (!user) return null;
 
@@ -66,7 +72,8 @@ class UserRepository {
 
     async findByPhone(phone) {
         // Remove spaces and format if necessary, for now exact match
-        return User.find({ phone: new RegExp(phone.trim().replace(/\s+/g, '\\s*'), 'i') });
+        const sanitizedPhone = this.escapeRegex(phone.trim().replace(/\s+/g, '\\s*'));
+        return User.find({ phone: new RegExp(sanitizedPhone, 'i') });
     }
 
     async findAll() {
@@ -75,6 +82,21 @@ class UserRepository {
 
     async delete(id) {
         return User.findByIdAndDelete(id);
+    }
+
+    async saveOTP(id, otp, expires) {
+        await User.findByIdAndUpdate(id, {
+            resetPasswordOTP: otp,
+            resetPasswordExpires: expires
+        });
+    }
+
+    async updatePassword(id, hashedPassword) {
+        await User.findByIdAndUpdate(id, {
+            password: hashedPassword,
+            resetPasswordOTP: null,
+            resetPasswordExpires: null
+        });
     }
 }
 

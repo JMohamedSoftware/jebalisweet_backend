@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const userRepository = require('../repositories/UserRepository');
+const userRepository = require('../repositories/userRepository');
 
 exports.getProfile = async (req, res, next) => {
     try {

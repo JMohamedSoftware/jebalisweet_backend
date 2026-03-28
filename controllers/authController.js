@@ -1,4 +1,4 @@
-const userRepository = require('../repositories/UserRepository');
+const userRepository = require('../repositories/userRepository');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendResetEmail } = require('../services/emailService');
@@ -173,10 +173,7 @@ exports.sendOTP = async (req, res, next) => {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expires = new Date(Date.now() + 10 * 60 * 1000);
 
-        await userRepository.update(user._id, {
-            resetPasswordOTP: otp,
-            resetPasswordExpires: expires
-        });
+        await userRepository.saveOTP(user._id, otp, expires);
 
         const emailSent = await sendResetEmail(user.email, user.firstName, otp);
 
@@ -194,6 +191,9 @@ exports.verifyOTP = async (req, res, next) => {
     const { userId, otp } = req.body;
     try {
         const user = await userRepository.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
 
         if (!user.resetPasswordOTP || user.resetPasswordOTP !== otp) {
             return res.status(400).json({ message: 'Code invalide.' });
@@ -213,6 +213,9 @@ exports.resetPassword = async (req, res, next) => {
     const { userId, otp, newPassword } = req.body;
     try {
         const userWrapper = await userRepository.findById(userId);
+        if (!userWrapper) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
 
         if (!userWrapper.resetPasswordOTP || userWrapper.resetPasswordOTP !== otp) {
             return res.status(400).json({ message: 'Code invalide ou session expiree.' });
@@ -224,11 +227,7 @@ exports.resetPassword = async (req, res, next) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        await userRepository.update(userId, {
-            password: hashedPassword,
-            resetPasswordOTP: null,
-            resetPasswordExpires: null
-        });
+        await userRepository.updatePassword(userId, hashedPassword);
 
         res.json({ message: 'Mot de passe réinitialisé avec succès.' });
     } catch (error) {

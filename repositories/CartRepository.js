@@ -88,13 +88,16 @@ class CartRepository {
         }
     }
 
-    async removeItem(userId, productId, customOptions = null, customImage = null) {
+    async removeItem(userId, productId, customOptions = null, customImage = null, comment = undefined) {
         const query = { product: productId };
         if (customOptions) {
             query.customOptions = customOptions;
         }
         if (customImage !== undefined) {
             query.customImage = customImage;
+        }
+        if (comment !== undefined) {
+            query.comment = comment;
         }
 
         await Cart.updateOne(

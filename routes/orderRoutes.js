@@ -13,5 +13,6 @@ router.get('/', orderController.getOrders);
 router.put('/:id/status', roleMiddleware(['admin', 'livreur']), orderController.updateOrderStatus);
 router.put('/:id/items', roleMiddleware(['admin']), orderController.updateOrderItems);
 router.put('/:id/assign-driver', roleMiddleware(['admin']), orderController.assignDriver);
+router.delete('/:id', roleMiddleware(['admin']), orderController.deleteOrder);
 
 module.exports = router;

@@ -37,22 +37,42 @@ class OrderRepository {
         let finalDiscount = 0;
         let validatedPromoCode = null;
         if (data.promoCode) {
-            const promo = await require('./PromoCodeRepository').validateCode(data.promoCode);
-            if (promo.valid) {
-                validatedPromoCode = promo.promo.code;
-                finalDiscount = promo.promo.type === 'percentage'
-                    ? (calculatedTotal * promo.promo.discount / 100)
-                    : promo.promo.discount;
+            const validationResult = await require('./PromoCodeRepository').validateCode(data.promoCode);
+            if (validationResult.valid) {
+                const promoDoc = validationResult.promo;
+                validatedPromoCode = promoDoc.code;
+                finalDiscount = promoDoc.type === 'percentage'
+                    ? (calculatedTotal * promoDoc.discount / 100)
+                    : promoDoc.discount;
                 
                 // Optional: Increment usage count on successful order
-                await require('./PromoCodeRepository').incrementUsage(promo.promo._id);
+                await require('./PromoCodeRepository').incrementUsage(promoDoc._id);
             }
         }
 
+        // 3. Update stock for each item using optimistic locking BEFORE creating the order
+        // This ensures that if stock is insufficient, the order won't be created.
+        for (const item of enrichedItems) {
+            if (item.product) {
+                const updatedProduct = await Product.findOneAndUpdate(
+                    { _id: item.product, stockQuantity: { $gte: item.quantity } },
+                    { $inc: { stockQuantity: -item.quantity } },
+                    { new: true }
+                );
+
+                if (!updatedProduct) {
+                    // Rollback stock for previously updated items if this one fails?
+                    // For now, throwing error is better than proceeding with invalid state.
+                    throw new Error(`Stock insuffisant pour le produit: ${item.name}`);
+                }
+            }
+        }
+
+        // 4. Create the final order
         const newOrder = await Order.create({
-            user: userId || null, // Allow null for admin-created orders
+            user: userId || null,
             items: enrichedItems,
-            totalAmount: calculatedTotal - finalDiscount, // Security: Use server-calculated total
+            totalAmount: calculatedTotal - finalDiscount,
             discountAmount: finalDiscount,
             promoCode: validatedPromoCode,
             deliveryAddress,
@@ -63,34 +83,13 @@ class OrderRepository {
             createdBy: createdBy || 'client'
         });
 
-        // Clear cart after order creation
+        // 5. Clear cart after successful order creation
         if (userId) {
             const userObjectId = (typeof userId === 'string' && userId.length === 24)
                 ? new (require('mongoose')).Types.ObjectId(userId)
                 : userId;
             await Cart.deleteOne({ user: userObjectId });
             console.log(`[ORDER] Cart cleared for user: ${userId}`);
-        }
-
-        // Update stock for each item using optimistic locking
-        for (const item of enrichedItems) {
-            if (item.product) {
-                // Determine if we should check stock (only if stock management is enabled/relevant)
-                // For simplified logic: always try to decrement safely.
-                const updatedProduct = await Product.findOneAndUpdate(
-                    { _id: item.product, stockQuantity: { $gte: item.quantity } },
-                    { $inc: { stockQuantity: -item.quantity } },
-                    { new: true }
-                );
-
-                if (!updatedProduct) {
-                    console.warn(`[ORDER] Stock update failed for product ${item.product}: Insufficient stock or concurrency issue.`);
-                    // Ideally, we should rollback the order here or flag it.
-                    // For now, we log the inconsistency and proceed (or could throw error to abort).
-                    // Given the current architecture, throwing might leave the order created but stock not updated if done after creation.
-                    // However, preventing negative stock is key.
-                }
-            }
         }
 
         return { orderId: newOrder._id.toString() };
@@ -181,6 +180,11 @@ class OrderRepository {
         }
         await order.save();
         return { message: 'Order updated successfully', total: newTotal };
+    }
+
+    async delete(id) {
+        await Order.findByIdAndDelete(id);
+        return { message: 'Order deleted successfully' };
     }
 }
 

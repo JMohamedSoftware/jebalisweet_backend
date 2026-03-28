@@ -22,9 +22,10 @@ const testEndpoint = (path) => {
                 if (res.statusCode === 200) {
                     try {
                         const jsonData = JSON.parse(data);
-                        console.log(`Items count: ${Array.isArray(jsonData) ? jsonData.length : 'Not an array'}`);
-                        if (Array.isArray(jsonData) && jsonData.length > 0) {
-                            console.log('Sample item:', JSON.stringify(jsonData[0], null, 2));
+                        const products = jsonData.products || jsonData;
+                        console.log(`Items count: ${Array.isArray(products) ? products.length : 'Not an array'}`);
+                        if (Array.isArray(products) && products.length > 0) {
+                            console.log('Sample item:', JSON.stringify(products[0], null, 2));
                         }
                     } catch (e) {
                         console.log('Response is not JSON:', data.substring(0, 100));

@@ -7,6 +7,7 @@ const roleMiddleware = require('../middleware/roleMiddleware');
 
 router.get('/', productController.getAllProducts);
 router.get('/metadata', productController.getProductMetadata);
+router.get('/related/:id', productController.getRelatedProducts);
 router.get('/:id', productController.getProductById);
 router.post('/', authMiddleware, roleMiddleware(['admin']), productController.createProduct);
 router.put('/:id', authMiddleware, roleMiddleware(['admin']), productController.updateProduct);

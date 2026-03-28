@@ -12,7 +12,7 @@ class ProductRepository {
 
         const query = {};
 
-        if (category && category !== 'Tous' && category !== 'Général') {
+        if (category && category !== 'Tous' && category !== 'Général' && category !== 'all' && category !== 'All') {
             const sanitizedCategory = escapeRegex(String(category));
             const regex = new RegExp(sanitizedCategory, 'i');
             query.$or = [
@@ -115,7 +115,11 @@ class ProductRepository {
 
         const product = await Product.findByIdAndUpdate(id, updateData, { new: true });
         if (!product) return null;
-        return product;
+        const obj = product.toObject();
+        return {
+            id: obj._id.toString(),
+            ...obj
+        };
     }
 
     async delete(id) {

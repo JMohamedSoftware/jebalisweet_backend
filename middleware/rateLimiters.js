@@ -10,8 +10,16 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 100, // Limit each IP to 100 requests per minute
+    max: 60, // Limit each IP to 60 requests per minute (was 100)
     message: { message: 'Trop de requêtes. Veuillez patienter.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const strictLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 20, // Limit each IP to 20 requests per 5 minutes
+    message: { message: 'Action suspecte détectée. Veuillez patienter.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -27,5 +35,6 @@ const testimonialLimiter = rateLimit({
 module.exports = {
     loginLimiter,
     apiLimiter,
-    testimonialLimiter
+    testimonialLimiter,
+    strictLimiter
 };
