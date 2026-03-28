@@ -10,7 +10,7 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 60, // Limit each IP to 60 requests per minute (was 100)
+    max: 500, // Increased from 100 to allow for bursts from shared IPs and parallel fetches
     message: { message: 'Trop de requêtes. Veuillez patienter.' },
     standardHeaders: true,
     legacyHeaders: false,
@@ -18,7 +18,7 @@ const apiLimiter = rateLimit({
 
 const strictLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 20, // Limit each IP to 20 requests per 5 minutes
+    max: 100, // Increased from 20 to improve usability while still blocking brute-force
     message: { message: 'Action suspecte détectée. Veuillez patienter.' },
     standardHeaders: true,
     legacyHeaders: false,
