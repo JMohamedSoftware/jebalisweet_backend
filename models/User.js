@@ -38,9 +38,16 @@ const userSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['active', 'pending', 'rejected'],
-        default: 'active'
+        enum: ['active', 'pending', 'rejected', 'pending_verification'],
+        default: 'active' // Default for now, we'll override in register
     },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
+    emailVerificationOTP: String,
+    emailVerificationExpires: Date,
+    registrationIP: String,
     resetPasswordOTP: String,
     resetPasswordExpires: Date,
     loginHistory: [{

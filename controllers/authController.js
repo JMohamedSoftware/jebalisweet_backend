@@ -1,7 +1,7 @@
 const userRepository = require('../repositories/userRepository');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { sendResetEmail } = require('../services/emailService');
+const { sendResetEmail, sendVerificationEmail } = require('../services/emailService');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -31,6 +31,15 @@ exports.login = async (req, res, next) => {
 
         if (!isMatch) {
             return res.status(401).json({ message: 'Identifiants incorrects.' });
+        }
+
+        if (user.status === 'pending_verification') {
+            return res.status(403).json({
+                message: 'Vérification requise',
+                status: 'pending_verification',
+                userId: user.id || user._id,
+                email: user.email
+            });
         }
 
         if (user.role === 'livreur' && user.status === 'pending') {
@@ -90,17 +99,28 @@ exports.register = async (req, res) => {
     const finalRole = (role === 'livreur') ? 'livreur' : 'client';
 
     try {
+        // Security: Avoid Registration Spam (1 Account per IP)
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        if (process.env.NODE_ENV === 'production' && finalRole !== 'livreur') {
+            const existingIP = await userRepository.findByRegistrationIP(ip);
+            if (existingIP) {
+                return res.status(403).json({ message: 'Un compte a déjà été créé depuis cette adresse IP. Contactez l\'assistance si c\'est une erreur.' });
+            }
+        }
+
         // Vérifier si l'email existe déjà
         const existing = await userRepository.findByEmail(email);
         if (existing) {
             return res.status(409).json({ message: 'Cet email est déjà utilisé.' });
         }
 
-        // Hachage du mot de passe
+        console.log('DEBUG: Hashing password...');
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
-        // Créer l'utilisateur
+        console.log('DEBUG: Generating OTP...');
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = new Date(Date.now() + 15 * 60 * 1000);
+        console.log('DEBUG: Creating user in DB...');
         const newUser = await userRepository.create({
             firstName,
             lastName,
@@ -112,24 +132,19 @@ exports.register = async (req, res) => {
             city: city || null,
             postalCode: postalCode || null,
             role: finalRole,
-            status: finalRole === 'livreur' ? 'pending' : 'active'
+            status: finalRole === 'livreur' ? 'pending' : 'pending_verification',
+            registrationIP: ip,
+            emailVerificationOTP: otp,
+            emailVerificationExpires: expires
         });
-
-        // Auto-login: generate token
-        const token = jwt.sign(
-            { id: newUser.id || newUser._id, email: newUser.email, role: newUser.role },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-
-        // Remove password from user object
-        const { password: _, ...userInfo } = newUser.toObject ? newUser.toObject() : newUser;
-
+        console.log('DEBUG: Sending verification email...');
+        await sendVerificationEmail(newUser.email, newUser.firstName, otp);
+        console.log('DEBUG: Registration complete.');
         res.status(201).json({
-            message: 'Inscription réussie',
-            user: userInfo,
-            token: token,
-            userId: newUser.id || newUser._id
+            message: 'Inscription réussie. Code de vérification envoyé.',
+            status: 'pending_verification',
+            userId: newUser.id || newUser._id,
+            email: newUser.email
         });
     } catch (error) {
         next(error);
@@ -149,11 +164,12 @@ exports.checkEmail = async (req, res, next) => {
             message: 'Compte trouvé',
             user: {
                 id: user._id,
-                firstName: user.firstName,
-                lastName: user.lastName,
                 email: user.email,
-                phone: user.phone,
-                role: user.role
+                // Only provide names if strictly needed by frontend, 
+                // but keep them for now to avoid breaking UI 
+                // while removing sensitive phone/role.
+                firstName: user.firstName,
+                lastName: user.lastName
             }
         });
     } catch (error) {
@@ -230,6 +246,58 @@ exports.resetPassword = async (req, res, next) => {
         await userRepository.updatePassword(userId, hashedPassword);
 
         res.json({ message: 'Mot de passe réinitialisé avec succès.' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.verifyEmail = async (req, res, next) => {
+    const { userId, otp } = req.body;
+    try {
+        const user = await userRepository.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+
+        if (user.isEmailVerified) {
+            return res.status(400).json({ message: 'Email déjà vérifié.' });
+        }
+
+        if (user.emailVerificationOTP !== otp) {
+            return res.status(400).json({ message: 'Code invalide.' });
+        }
+
+        if (new Date() > new Date(user.emailVerificationExpires)) {
+            return res.status(400).json({ message: 'Code expiré. Veuillez générer un nouveau code.' });
+        }
+
+        await userRepository.verifyEmail(userId);
+
+        res.json({ message: 'Email vérifié avec succès. Vous pouvez maintenant vous connecter.' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.resendVerificationOTP = async (req, res, next) => {
+    const { userId } = req.body;
+    try {
+        const user = await userRepository.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+
+        if (user.isEmailVerified) {
+            return res.status(400).json({ message: 'Email déjà vérifié.' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+        await userRepository.saveVerificationOTP(userId, otp, expires);
+        await sendVerificationEmail(user.email, user.firstName, otp);
+
+        res.json({ message: 'Nouveau code envoyé avec succès.' });
     } catch (error) {
         next(error);
     }

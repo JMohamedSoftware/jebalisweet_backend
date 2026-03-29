@@ -30,6 +30,10 @@ class UserRepository {
         };
     }
 
+    async findByRegistrationIP(ip) {
+        return User.findOne({ registrationIP: ip });
+    }
+
     async findById(id) {
         const user = await User.findById(id);
         if (!user) return null;
@@ -40,7 +44,7 @@ class UserRepository {
     }
     async update(id, data) {
         // Security: Whitelist allowed fields to prevent prototype pollution and unauthorized role changes
-        const allowedFields = ['firstName', 'lastName', 'username', 'phone', 'address', 'city', 'postalCode', 'preferences', 'loginHistory', 'role', 'status'];
+        const allowedFields = ['firstName', 'lastName', 'username', 'phone', 'address', 'city', 'postalCode', 'preferences', 'loginHistory', 'role', 'status', 'isEmailVerified', 'emailVerificationOTP', 'emailVerificationExpires', 'registrationIP'];
         const filteredData = {};
 
         allowedFields.forEach(field => {
@@ -96,6 +100,21 @@ class UserRepository {
             password: hashedPassword,
             resetPasswordOTP: null,
             resetPasswordExpires: null
+        });
+    }
+    async saveVerificationOTP(id, otp, expires) {
+        await User.findByIdAndUpdate(id, {
+            emailVerificationOTP: otp,
+            emailVerificationExpires: expires
+        });
+    }
+
+    async verifyEmail(id) {
+        await User.findByIdAndUpdate(id, {
+            isEmailVerified: true,
+            status: 'active',
+            emailVerificationOTP: null,
+            emailVerificationExpires: null
         });
     }
 }

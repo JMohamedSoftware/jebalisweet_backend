@@ -9,5 +9,7 @@ router.post('/check-email', apiLimiter, authController.checkEmail);
 router.post('/forgot-password/send', apiLimiter, authController.sendOTP);
 router.post('/forgot-password/verify', apiLimiter, authController.verifyOTP);
 router.post('/forgot-password/reset', apiLimiter, authController.resetPassword);
+router.post('/verify-email', apiLimiter, authController.verifyEmail);
+router.post('/resend-verification', apiLimiter, authController.resendVerificationOTP);
 
 module.exports = router;

@@ -10,9 +10,7 @@ const isSecure = emailPort === 465;
 
 // Force fresh deployment to verify IPv4 fix on Render
 const transporter = nodemailer.createTransport({
-    host: 'smtp.googlemail.com', // Alternative hostname
-    port: 465,
-    secure: true, // Port 465 uses SSL directly
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -21,6 +19,7 @@ const transporter = nodemailer.createTransport({
     debug: true,      // Show debug output in logs
     logger: true,     // Log information to console
     family: 4,        // Force IPv4 (Crucial for Render/Gmail timeouts)
+    proxy: false,     // Disable any automatic proxy detection to fix ERR_INVALID_URL
     tls: {
         rejectUnauthorized: false
     },
@@ -273,6 +272,33 @@ const sendResetEmail = async (email, firstName, otp) => {
 };
 
 /**
+ * Send Email Verification OTP
+ */
+const sendVerificationEmail = async (email, firstName, otp) => {
+    console.log('DEBUG: sendVerificationEmail CALLED with:', { email, firstName, otp });
+    const fromAddress = process.env.EMAIL_USER || process.env.EMAIL_FROM || 'jbelimohamed.software@gmail.com';
+    console.log('DEBUG: fromAddress:', fromAddress);
+    
+    const mailOptions = {
+        from: String(`"Jebali Sweet" <${fromAddress}>`),
+        to: String(email),
+        subject: 'Vérifiez votre compte - Jebali Sweet',
+        text: String(`Votre code de vérification est : ${otp}`),
+    };
+
+    console.log('DEBUG: FINAL mailOptions:', JSON.stringify(mailOptions, null, 2));
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Email de vérification envoyé à ${email}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Erreur envoi email vérification:', error.message);
+        return false;
+    }
+};
+
+/**
  * Verify transporter configuration
  */
 const verifyConnection = async () => {
@@ -290,5 +316,6 @@ module.exports = {
     transporter,
     sendEmail,
     sendResetEmail,
+    sendVerificationEmail,
     verifyConnection
 };
