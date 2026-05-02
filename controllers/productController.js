@@ -39,7 +39,7 @@ exports.createProduct = async (req, res, next) => {
     let { 
         name, description, price, image, category_id, categoryName, brand, stockQuantity, 
         isFeatured, inStock, images, sku, approxPieces, onOrderOnly, leadTime, 
-        conservation, ingredients, priceUnit 
+        conservation, ingredients, priceUnit, variants
     } = req.body;
     try {
         if (!categoryName && category_id) {
@@ -50,7 +50,7 @@ exports.createProduct = async (req, res, next) => {
         const result = await productRepository.create({
             name, description, price, image, category_id, categoryName, brand, stockQuantity,
             featured: isFeatured, inStock, priceUnit, images, sku, approxPieces, 
-            onOrderOnly, leadTime, conservation, ingredients
+            onOrderOnly, leadTime, conservation, ingredients, variants
         });
         res.status(201).json({ id: result.id, message: 'Produit créé.' });
     } catch (error) {
@@ -63,7 +63,7 @@ exports.updateProduct = async (req, res, next) => {
     let { 
         name, description, price, image, category_id, categoryName, brand, stockQuantity, 
         isFeatured, inStock, images, sku, approxPieces, onOrderOnly, leadTime, 
-        conservation, ingredients, priceUnit 
+        conservation, ingredients, priceUnit, variants
     } = req.body;
     try {
         if (!categoryName && category_id) {
@@ -74,7 +74,7 @@ exports.updateProduct = async (req, res, next) => {
         const updatedProduct = await productRepository.update(id, {
             name, description, price, image, category_id, categoryName, brand, stockQuantity,
             featured: isFeatured, inStock, priceUnit, images, sku, approxPieces, 
-            onOrderOnly, leadTime, conservation, ingredients
+            onOrderOnly, leadTime, conservation, ingredients, variants
         });
 
         if (!updatedProduct) {

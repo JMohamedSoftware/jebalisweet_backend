@@ -36,7 +36,7 @@ class ProductRepository {
         }
 
         if (inStock === 'true' || inStock === true) {
-            query.stockQuantity = { $gt: 0 };
+            // Stock logic removed
         }
 
         if (featured === 'true' || featured === true) {
@@ -81,7 +81,8 @@ class ProductRepository {
                 ...obj,
                 category_name: obj.categoryName, // Maintain compatibility
                 stock_quantity: obj.stockQuantity,
-                inStock: obj.stockQuantity > 0
+                inStock: true,
+                variants: obj.variants || []
             };
         });
 

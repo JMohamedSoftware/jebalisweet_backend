@@ -50,21 +50,10 @@ class OrderRepository {
             }
         }
 
-        // 3. Update stock for each item using optimistic locking BEFORE creating the order
-        // This ensures that if stock is insufficient, the order won't be created.
+        // 3. Stock updates have been removed based on request.
         for (const item of enrichedItems) {
             if (item.product) {
-                const updatedProduct = await Product.findOneAndUpdate(
-                    { _id: item.product, stockQuantity: { $gte: item.quantity } },
-                    { $inc: { stockQuantity: -item.quantity } },
-                    { new: true }
-                );
-
-                if (!updatedProduct) {
-                    // Rollback stock for previously updated items if this one fails?
-                    // For now, throwing error is better than proceeding with invalid state.
-                    throw new Error(`Stock insuffisant pour le produit: ${item.name}`);
-                }
+                // Stock deduction logic removed
             }
         }
 

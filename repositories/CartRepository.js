@@ -25,7 +25,8 @@ class CartRepository {
                     stockQuantity: p.stockQuantity || 0,
                     comment: item.comment,
                     customImage: item.customImage,
-                    customOptions: item.customOptions
+                    customOptions: item.customOptions,
+                    priceUnit: p.priceUnit
                 };
             }).filter(i => i !== null);
         } catch (error) {

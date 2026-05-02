@@ -15,8 +15,8 @@ exports.getCart = async (req, res) => {
             image: item.image,
             quantity: item.quantity,
             stockQuantity: item.stockQuantity || 0,
-            availability: (item.stockQuantity || 0) > 0 ? 'in_stock' : 'out_of_stock',
-            maxQuantity: item.stockQuantity || 0,
+            availability: 'in_stock',
+            maxQuantity: item.priceUnit === 'kg' ? 5 : 50,
             comment: item.comment,
             customImage: item.customImage,
             customOptions: item.customOptions

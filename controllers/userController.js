@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const userRepository = require('../repositories/userRepository');
+const userRepository = require('../repositories/UserRepository');
 
 exports.getProfile = async (req, res, next) => {
     try {
@@ -21,7 +21,15 @@ exports.getProfile = async (req, res, next) => {
             userInfo = user._doc;
         }
 
-        const { password, resetPasswordOTP, resetPasswordExpires, ...safeUser } = userInfo;
+        const { 
+            password, 
+            resetPasswordOTP, 
+            resetPasswordExpires, 
+            otpAttempts, 
+            registrationIP, 
+            machineId, 
+            ...safeUser 
+        } = userInfo;
         res.json(safeUser);
     } catch (error) {
         next(error);
@@ -55,7 +63,15 @@ exports.updateProfile = async (req, res, next) => {
             userInfo = updatedUser._doc;
         }
 
-        const { password: _, resetPasswordOTP, resetPasswordExpires, ...safeUser } = userInfo;
+        const { 
+            password: _, 
+            resetPasswordOTP, 
+            resetPasswordExpires, 
+            otpAttempts, 
+            registrationIP, 
+            machineId, 
+            ...safeUser 
+        } = userInfo;
         res.json(safeUser);
     } catch (error) {
         next(error);
@@ -217,7 +233,14 @@ exports.impersonateUser = async (req, res, next) => {
         );
 
         const userObj = user.toObject ? user.toObject() : user;
-        const { password: _, readablePassword: __, ...userInfo } = userObj;
+        const { 
+            password: _, 
+            readablePassword: __, 
+            otpAttempts: ___, 
+            registrationIP: ____, 
+            machineId: _____, 
+            ...userInfo 
+        } = userObj;
 
         res.json({
             message: 'Mode impersonation activé',

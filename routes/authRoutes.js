@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { loginLimiter, apiLimiter } = require('../middleware/rateLimiters');
+const { loginLimiter, apiLimiter, registrationLimiter } = require('../middleware/rateLimiters');
+const fingerprintMiddleware = require('../middleware/fingerprintMiddleware');
 
 router.post('/login', loginLimiter, authController.login);
-router.post('/register', apiLimiter, authController.register);
+router.post('/register', fingerprintMiddleware, registrationLimiter, authController.register);
 router.post('/check-email', apiLimiter, authController.checkEmail);
 router.post('/forgot-password/send', apiLimiter, authController.sendOTP);
 router.post('/forgot-password/verify', apiLimiter, authController.verifyOTP);

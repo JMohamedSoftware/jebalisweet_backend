@@ -64,6 +64,7 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const testimonialRoutes = require('./routes/testimonialRoutes');
 const promoRoutes = require('./routes/promotionRoutes');
 const promoCodeRoutes = require('./routes/promoCodeRoutes');
+const heroRoutes = require('./routes/heroRoutes');
 
 // DB status check
 app.get('/api/db-status', async (req, res) => {
@@ -92,6 +93,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/promotions', promoRoutes);
 app.use('/api/promo-codes', promoCodeRoutes);
 app.use('/api/testimonials', testimonialRoutes);
+app.use('/api/hero', heroRoutes);
 
 // Error Handler
 app.use((err, req, res, next) => {

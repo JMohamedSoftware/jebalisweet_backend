@@ -32,9 +32,19 @@ const testimonialLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+const registrationLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    max: 3, // Limit each machine to 3 accounts per day
+    keyGenerator: (req) => req.machineId || req.ip,
+    message: { message: "Limite d'inscription atteinte. Vous pouvez créer au maximum 3 comptes par jour depuis cet appareil." },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 module.exports = {
     loginLimiter,
     apiLimiter,
     testimonialLimiter,
-    strictLimiter
+    strictLimiter,
+    registrationLimiter
 };

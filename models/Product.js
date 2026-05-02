@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
 
+const variantSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    options: [{ type: String }]
+}, { _id: false });
+
 const productSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: String,
@@ -23,6 +28,7 @@ const productSchema = new mongoose.Schema({
     rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     featured: { type: Boolean, default: false },
+    variants: { type: [variantSchema], default: [] },
     createdAt: { type: Date, default: Date.now }
 });
 

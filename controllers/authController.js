@@ -1,7 +1,8 @@
-const userRepository = require('../repositories/userRepository');
+const userRepository = require('../repositories/UserRepository');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendResetEmail, sendVerificationEmail } = require('../services/emailService');
+const User = require('../models/User'); // Import User for device-level checks
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -98,14 +99,44 @@ exports.register = async (req, res) => {
     // Security: Never allow role escalation from request body
     const finalRole = (role === 'livreur') ? 'livreur' : 'client';
 
+    // Security: Handle Bot Domains and Device Limits
+    const blacklistedDomains = ['service.com', 'test2.com', 'gmqail.com', 'tempmail.com', 'fabaos.com'];
+    const emailDomain = email.split('@')[1];
+    
+    if (blacklistedDomains.includes(emailDomain)) {
+        return res.status(403).json({ message: 'Ce domaine d\'email est bloqué pour des raisons de sécurité.' });
+    }
+
     try {
-        // Security: Avoid Registration Spam (1 Account per IP)
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        // 1. IP and Machine Fingerprint capture
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const machineId = req.machineId;
+
+        // 2. Strict Check: Max 3 accounts per device/machine in 24 hours
+        // This is a database-level backup to the rate-limiter
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const registrationsToday = await User.countDocuments({
+            machineId: machineId,
+            createdAt: { $gte: twentyFourHoursAgo }
+        });
+
+        if (registrationsToday >= 3) {
+            return res.status(429).json({ 
+                message: 'Limite atteinte. Vous ne pouvez créer que 3 comptes par jour depuis cet appareil.' 
+            });
+        }
+
+        // 3. Security: Prevent IP spam (1 account per IP if requested)
         if (process.env.NODE_ENV === 'production' && finalRole !== 'livreur') {
-            const existingIP = await userRepository.findByRegistrationIP(ip);
-            if (existingIP) {
-                return res.status(403).json({ message: 'Un compte a déjà été créé depuis cette adresse IP. Contactez l\'assistance si c\'est une erreur.' });
-            }
+             // We can be more lenient or keep the existing single-IP check
+             // For now, let's allow it up to 3 per IP too for consistency
+             const ipLimitToday = await User.countDocuments({
+                 registrationIP: ip,
+                 createdAt: { $gte: twentyFourHoursAgo }
+             });
+             if (ipLimitToday >= 3) {
+                 return res.status(429).json({ message: 'Limite d\'inscription par IP atteinte.' });
+             }
         }
 
         // Vérifier si l'email existe déjà
@@ -134,6 +165,7 @@ exports.register = async (req, res) => {
             role: finalRole,
             status: finalRole === 'livreur' ? 'pending' : 'pending_verification',
             registrationIP: ip,
+            machineId: machineId,
             emailVerificationOTP: otp,
             emailVerificationExpires: expires
         });
@@ -189,7 +221,12 @@ exports.sendOTP = async (req, res, next) => {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expires = new Date(Date.now() + 10 * 60 * 1000);
 
-        await userRepository.saveOTP(user._id, otp, expires);
+        // Reset attempts when sending a new one
+        await User.findByIdAndUpdate(user._id, {
+            resetPasswordOTP: otp,
+            resetPasswordExpires: expires,
+            otpAttempts: 0
+        });
 
         const emailSent = await sendResetEmail(user.email, user.firstName, otp);
 
@@ -206,13 +243,39 @@ exports.sendOTP = async (req, res, next) => {
 exports.verifyOTP = async (req, res, next) => {
     const { userId, otp } = req.body;
     try {
-        const user = await userRepository.findById(userId);
+        const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ message: 'Utilisateur non trouvé.' });
         }
 
-        if (!user.resetPasswordOTP || user.resetPasswordOTP !== otp) {
-            return res.status(400).json({ message: 'Code invalide.' });
+        // Security: Block if 5 attempts already reached
+        if (user.otpAttempts >= 5) {
+            return res.status(403).json({ message: 'Trop de tentatives échouées. Veuillez demander un nouveau code.' });
+        }
+
+        if (!user.resetPasswordOTP) {
+             return res.status(400).json({ message: 'Aucun code actif. Veuillez en demander un nouveau.' });
+        }
+
+        if (user.resetPasswordOTP !== otp) {
+            // Increment failure count
+            const newAttempts = (user.otpAttempts || 0) + 1;
+            const updateObj = { otpAttempts: newAttempts };
+            
+            // If failure reaches 5, clear the code entirely
+            if (newAttempts >= 5) {
+                updateObj.resetPasswordOTP = null;
+                updateObj.resetPasswordExpires = null;
+            }
+            
+            await User.findByIdAndUpdate(userId, updateObj);
+            
+            const remaining = 5 - newAttempts;
+            return res.status(400).json({ 
+                message: newAttempts >= 5 
+                    ? 'Limite de tentatives atteinte. Votre code est invalidé. Veuillez en demander un nouveau.' 
+                    : `Code incorrect. Il vous reste ${remaining} tentative(s).` 
+            });
         }
 
         if (new Date() > new Date(user.resetPasswordExpires)) {
@@ -243,7 +306,12 @@ exports.resetPassword = async (req, res, next) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        await userRepository.updatePassword(userId, hashedPassword);
+        await User.findByIdAndUpdate(userId, {
+            password: hashedPassword,
+            resetPasswordOTP: null,
+            resetPasswordExpires: null,
+            otpAttempts: 0
+        });
 
         res.json({ message: 'Mot de passe réinitialisé avec succès.' });
     } catch (error) {

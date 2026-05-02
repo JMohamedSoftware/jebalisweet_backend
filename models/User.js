@@ -48,8 +48,16 @@ const userSchema = new mongoose.Schema({
     emailVerificationOTP: String,
     emailVerificationExpires: Date,
     registrationIP: String,
+    machineId: {
+        type: String,
+        index: true // Index for performance when counting registrations per device
+    },
     resetPasswordOTP: String,
     resetPasswordExpires: Date,
+    otpAttempts: {
+        type: Number,
+        default: 0
+    },
     loginHistory: [{
         ip: String,
         timestamp: {
