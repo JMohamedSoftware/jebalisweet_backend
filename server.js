@@ -36,7 +36,24 @@ const hpp = require('hpp');
 const helmet = require('helmet');
 
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+    'https://www.jebalisweet.tn',
+    'https://jebalisweet.tn',
+    'http://localhost:4028',
+    'http://localhost:3000'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,6 +82,7 @@ const testimonialRoutes = require('./routes/testimonialRoutes');
 const promoRoutes = require('./routes/promotionRoutes');
 const promoCodeRoutes = require('./routes/promoCodeRoutes');
 const heroRoutes = require('./routes/heroRoutes');
+const seedRoutes = require('./routes/seedRoutes');
 
 // DB status check
 app.get('/api/db-status', async (req, res) => {
@@ -94,6 +112,7 @@ app.use('/api/promotions', promoRoutes);
 app.use('/api/promo-codes', promoCodeRoutes);
 app.use('/api/testimonials', testimonialRoutes);
 app.use('/api/hero', heroRoutes);
+app.use('/api/seed', seedRoutes);
 
 // Error Handler
 app.use((err, req, res, next) => {

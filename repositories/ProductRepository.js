@@ -65,6 +65,8 @@ class ProductRepository {
             productQuery = productQuery.sort({ createdAt: -1 });
         }
 
+        productQuery = productQuery.lean();
+
         if (limit > 0) {
             productQuery = productQuery.skip(skip).limit(limit);
         }
@@ -75,14 +77,13 @@ class ProductRepository {
         ]);
 
         const mappedProducts = products.map(p => {
-            const obj = p.toObject();
             return {
-                id: obj._id.toString(),
-                ...obj,
-                category_name: obj.categoryName, // Maintain compatibility
-                stock_quantity: obj.stockQuantity,
+                id: p._id.toString(),
+                ...p,
+                category_name: p.categoryName, // Maintain compatibility
+                stock_quantity: p.stockQuantity,
                 inStock: true,
-                variants: obj.variants || []
+                variants: p.variants || []
             };
         });
 
@@ -91,12 +92,11 @@ class ProductRepository {
 
     async findById(id) {
         try {
-            const product = await Product.findById(id);
+            const product = await Product.findById(id).lean();
             if (!product) return null;
-            const obj = product.toObject();
             return {
-                id: obj._id.toString(),
-                ...obj
+                id: product._id.toString(),
+                ...product
             };
         } catch (e) {
             return null;

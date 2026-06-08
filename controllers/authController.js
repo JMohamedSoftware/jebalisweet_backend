@@ -112,7 +112,7 @@ exports.register = async (req, res) => {
         const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         const machineId = req.machineId;
 
-        // 2. Strict Check: Max 3 accounts per device/machine in 24 hours
+        // 2. Strict Check: Max 2 accounts per device/machine in 24 hours
         // This is a database-level backup to the rate-limiter
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const registrationsToday = await User.countDocuments({
@@ -120,22 +120,19 @@ exports.register = async (req, res) => {
             createdAt: { $gte: twentyFourHoursAgo }
         });
 
-        if (registrationsToday >= 3) {
+        if (registrationsToday >= 2) {
             return res.status(429).json({ 
-                message: 'Limite atteinte. Vous ne pouvez créer que 3 comptes par jour depuis cet appareil.' 
+                message: 'Limite atteinte. Vous ne pouvez créer que 2 comptes par jour depuis cet appareil.' 
             });
         }
 
-        // 3. Security: Prevent IP spam (1 account per IP if requested)
-        if (process.env.NODE_ENV === 'production' && finalRole !== 'livreur') {
-             // We can be more lenient or keep the existing single-IP check
-             // For now, let's allow it up to 3 per IP too for consistency
-             const ipLimitToday = await User.countDocuments({
-                 registrationIP: ip,
-                 createdAt: { $gte: twentyFourHoursAgo }
+        // 3. Security: Prevent IP spam (Max 2 accounts per IP total)
+        if (finalRole !== 'livreur') {
+             const ipLimitTotal = await User.countDocuments({
+                 registrationIP: ip
              });
-             if (ipLimitToday >= 3) {
-                 return res.status(429).json({ message: 'Limite d\'inscription par IP atteinte.' });
+             if (ipLimitTotal >= 2) {
+                 return res.status(429).json({ message: 'Limite d\'inscription par IP atteinte (Maximum 2 comptes).' });
              }
         }
 

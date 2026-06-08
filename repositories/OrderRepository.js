@@ -99,29 +99,29 @@ class OrderRepository {
         const orders = await Order.find(query)
             .populate('user', 'username email')
             .populate('deliveryDriver', 'username email')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
         return orders.map(order => {
-            const obj = order.toObject();
             return {
-                id: obj._id.toString(),
-                userId: obj.user?._id?.toString() || null,
-                customerName: obj.user?.username || (obj.createdBy === 'admin' ? 'Admin Order' : 'Unknown'),
-                customerEmail: obj.user?.email || 'N/A',
-                total: obj.totalAmount,
-                status: obj.status,
-                deliveryAddress: obj.deliveryAddress,
-                phone: obj.phone,
-                paymentMethod: obj.paymentMethod,
-                deliveryOption: obj.deliveryOption,
-                promoCode: obj.promoCode || null,
-                discountAmount: obj.discountAmount || 0,
-                deliveryDriverId: obj.deliveryDriver?._id?.toString() || null,
-                deliveryDriverName: obj.deliveryDriver?.username || null,
-                estimatedDeliveryTime: obj.estimatedDeliveryTime,
-                createdBy: obj.createdBy,
-                createdAt: obj.createdAt,
-                items: obj.items.map(i => ({
+                id: order._id.toString(),
+                userId: order.user?._id?.toString() || null,
+                customerName: order.user?.username || (order.createdBy === 'admin' ? 'Admin Order' : 'Unknown'),
+                customerEmail: order.user?.email || 'N/A',
+                total: order.totalAmount,
+                status: order.status,
+                deliveryAddress: order.deliveryAddress,
+                phone: order.phone,
+                paymentMethod: order.paymentMethod,
+                deliveryOption: order.deliveryOption,
+                promoCode: order.promoCode || null,
+                discountAmount: order.discountAmount || 0,
+                deliveryDriverId: order.deliveryDriver?._id?.toString() || null,
+                deliveryDriverName: order.deliveryDriver?.username || null,
+                estimatedDeliveryTime: order.estimatedDeliveryTime,
+                createdBy: order.createdBy,
+                createdAt: order.createdAt,
+                items: order.items.map(i => ({
                     productId: i.product?.toString(),
                     name: i.name,
                     quantity: i.quantity,
